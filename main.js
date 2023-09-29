@@ -1,114 +1,146 @@
+class Snake {
+  constructor() {
+    this.body = [{x:10, y:12}];
+    this.direction ="right"
+  }
+
+  move() {
+    const head = this.body[0];
+
+    let newX = head.x;
+    let newY = head.y;
+
+    switch(this.direction) {
+      case 'up': newY--;break;
+      case 'down': newY++;break;
+      case 'left': newX--;break;
+      case 'right': newX++;break;
+    }
+
+    this.body.unshift({x: newX, y: newY})
+  }
+
+  changeDirection(newDirection) {
+    const oppositeDirections = {up: 'down', down: 'up', left: 'right', right: 'left'};
+
+    if (newDirection !== oppositeDirections[this.direction]) {
+      this.direction = newDirection
+    }
+  }
+
+  checkCollision(boardSize) {
+    const head = this.body[0];
+
+    if (head.x < 0 || head.y < 0 || head.x >= boardSize || head.y >= boardSize) {
+      return true;
+    }
+
+    for (let i=1; i<this.body.length; i++) {
+      if (head.x === this.body[i].x && head.y === this.body[i].y) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  eat(food) {
+    const head = this.body[0];
+
+    if (head.x === food.x && head.y === food.y) {
+      return true
+    }
+
+    return false
+  }
+}
+
+class Food {
+  constructor(boardSize) {
+    this.boardSize = boardSize;
+    this.respawn();
+  }
+
+  respawn() {
+    do {
+      this.x = Math.floor(Math.random() * this.boardSize);
+      this.y = Math.floor(Math.random() * this.boardSize);
+    } while (snake.body.some(res => res.x === this.x && res.y === this.y))
+  }
+}
+
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
 
 const CANVAS_WIDTH = canvas.width = 500;
-const CANVAS_hEIGHT = canvas.height = 500;
-const CEIL_SIZE = 20;
+const CANVAS_HEIGHT = canvas.height = 500;
+const BOARD_SIZE = 20;
+const CEIL_SIZE = CANVAS_WIDTH / BOARD_SIZE;
 
-let food = {};
-let snake = [{x:24, y:24}];
+let snake = new Snake();
+let food = new Food(BOARD_SIZE);
+
 let direction = {x: 0, y: -1};
 let lastTime = 0;
-let level = 2;
+let SNAKE_SPEED = 2;
+let gameIsRunning = true;
 
-function init() {
-  drawFood();
-  drawSnake();
-  game();
-}
+function main(currentTime) {
+  if (!gameIsRunning) return;
 
-function getRandom() {
-  return Math.floor(Math.random() * 25)
-}
+  const delta = (currentTime - lastTime) / 1000;
 
-function getNewCoords() {
-  return {x: getRandom(), y: getRandom()}
-}
+  if (delta >= 1 / SNAKE_SPEED) {
+    lastTime = currentTime;
 
-function getCollisionFood(food) {
-    return snake.filter(res => res.x === food.x && res.y === food.y).length > 0
-}
+    ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
-function drawFood() {
-  food = getNewCoords();
-  
-  while(getCollisionFood(food)) {
-    food = getNewCoords();
-  }
-  
-  ctx.fillStyle = 'red';
-  ctx.fillRect(food.x * CEIL_SIZE, food.y * CEIL_SIZE, CEIL_SIZE, CEIL_SIZE);
-}
+    snake.move();
 
-function drawSnake() {
-  snake.forEach((el, i) => {
-    ctx.fillStyle = 'white';
-    ctx.fillRect(el.x * CEIL_SIZE, el.y * CEIL_SIZE, CEIL_SIZE, CEIL_SIZE);
-  })
-}
+    if (snake.checkCollision(BOARD_SIZE)) {
+      alert("GAME OVER (((")
+      restartGame();
+      return;
+    }
 
-function game(ctime) {
-  requestAnimationFrame(game);
-  
-  if ((ctime - lastTime)/1000 < 1 / level) {
-    return;
-  }
-  
-  lastTime = ctime;
-  
-  moveSnake();
-}
+    if (snake.eat(food)) {
+      food.respawn()
+    } else {
+      snake.body.pop()
+    }
 
-function getCollisionSnake() {
-  let first = snake[0];
+    // Draw food
+    ctx.fillStyle = "grey";
+    ctx.fillRect(food.x * CEIL_SIZE, food.y * CEIL_SIZE, CEIL_SIZE, CEIL_SIZE);
 
-  return snake.filter((res, i) => {
-    return i !== 0 && res.x === first.x && res.y === first.y
-  }).length > 0
-}
-
-function moveSnake() {
-  const first = {x: snake[0].x + direction.x, y: snake[0].y + direction.y};
-  const last = snake.at(-1);
-
-  snake.unshift({x: first.x, y: first.y});
-  ctx.fillRect(first.x * CEIL_SIZE, first.y * CEIL_SIZE, CEIL_SIZE, CEIL_SIZE);
-  
-  if (first.x === food.x && first.y === food.y) {
-
-    const elem = food;
-
-    drawFood();
-
-    ctx.fillStyle = 'white';
-    ctx.fillRect(elem.x * CEIL_SIZE, elem.y * CEIL_SIZE, CEIL_SIZE, CEIL_SIZE)
-
-  } else {
-    snake.pop();
-    ctx.clearRect(last.x * CEIL_SIZE, last.y * CEIL_SIZE, CEIL_SIZE, CEIL_SIZE);
-  }
-  
-  if (first.x < 0 || first.x > 24 || first.y < 0 || first.y > 24) {
-    alert('Game over');
-    direction = {x:0, y:0};
-    snake = [{x:10, y:11}];
+    // Draw snake
+    ctx.fillStyle = "purple";
+    snake.body.forEach((segment) => {
+      ctx.fillRect(segment.x * CEIL_SIZE, segment.y * CEIL_SIZE, CEIL_SIZE, CEIL_SIZE);
+    });
   }
 
-  if (getCollisionSnake()) {
-    alert('Game over');
-    direction = {x:0, y:0};
-    snake = [{x:10, y:11}];
-  }
+  requestAnimationFrame(main);
+}
+
+function restartGame() {
+  snake = new Snake();
+  food = new Food(BOARD_SIZE);
+
+  gameIsRunning = true;
+  lastTime = 0;
+
+  requestAnimationFrame(main)
 }
 
 window.addEventListener('keydown', e => {
   switch(e.key) {
-    case 'ArrowDown': direction = {x:0, y:1};break;
-    case 'ArrowUp': direction = {x:0, y:-1};break;
-    case 'ArrowLeft': direction = {x:-1, y:0};break;
-    case 'ArrowRight': direction = {x:1, y:0};break;
-    default: direction = {x:0, y:-1};
+    case 'ArrowDown': snake.changeDirection('down');break;
+    case 'ArrowUp': snake.changeDirection('up');break;
+    case 'ArrowLeft': snake.changeDirection('left');break;
+    case 'ArrowRight': snake.changeDirection('right');break;
+    default: snake.direction('right');
   }
 })
 
-init();
+restartGame();
